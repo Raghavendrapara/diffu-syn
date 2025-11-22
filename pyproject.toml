@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel", "Cython>=3.0", "numpy>=1.26"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "diffusyn"
+version = "0.1.0"
+description = "Enterprise-grade Privacy-Preserving Synthetic Data Engine using Tabular Diffusion"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Raghavendra", email = "rsc4200@gmail.com"}
+]
+
+# The Production Dependencies
+dependencies = [
+    "torch>=2.2.0",          
+    "polars>=0.20.0",        # Data Loader (Rust-based)
+    "numpy>=1.26.0",         # Math
+    "fastapi>=0.109.0",      # The API
+    "uvicorn[standard]>=0.27.0", # The Server
+    "celery>=5.3.0",         # Task Queue
+    "redis>=5.0.0",          # Broker connector
+    "python-multipart",      # For file uploads
+    "pydantic>=2.6.0",       # Data Validation
+    "pydantic-settings>=2.1.0", # Config management
+    "opacus>=1.4.0",         # Differential Privacy (Meta)
+    "sdmetrics>=0.13.0"      # Validation (MIT License)
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",           # Testing
+    "httpx>=0.26.0",         # API Testing Client
+    "black>=24.0",           # Formatter
+    "ruff>=0.2.0",           # Linter (Fast!)
+    "jupyterlab>=4.0"        # Notebooks for R&D
+]
+
+# --- Tool Configurations ---
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "-ra -q"
