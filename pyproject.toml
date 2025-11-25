@@ -26,7 +26,8 @@ dependencies = [
     "pydantic>=2.6.0",       # Data Validation
     "pydantic-settings>=2.1.0", # Config management
     "opacus>=1.4.0",         # Differential Privacy (Meta)
-    "sdmetrics>=0.13.0"      # Validation (MIT License)
+    "sdmetrics>=0.13.0",      # Validation (MIT License)
+    "tqdm>=4.66.0"
 ]
 
 [project.optional-dependencies]
@@ -48,3 +49,9 @@ target-version = "py310"
 testpaths = ["tests"]
 python_files = "test_*.py"
 addopts = "-ra -q"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
