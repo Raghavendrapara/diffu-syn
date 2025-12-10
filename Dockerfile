@@ -11,7 +11,6 @@ RUN apt-get update && apt-get install -y gcc && rm -rf /var/lib/apt/lists/*
 COPY pyproject.toml README.md ./
 
 # 3. Install Dependencies (Server Mode)
-# This installs all the libraries in pyproject.toml [server]
 RUN pip install --no-cache-dir ".[server]"
 
 # 4. Copy Source Code

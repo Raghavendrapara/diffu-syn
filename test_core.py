@@ -8,7 +8,7 @@ df = pl.DataFrame({
     "salary": np.random.normal(50000, 15000, 1000),
     "score": np.random.rand(1000)
 })
-
+print(df.head(10))
 print("✅ Data Created")
 
 # 2. Initialize Model (FIXED: No epochs here)

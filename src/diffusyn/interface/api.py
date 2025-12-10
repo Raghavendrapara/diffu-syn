@@ -1,52 +1,45 @@
-import os
 import uuid
-
-import aiofiles
+import os
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from diffusyn.interface.config import settings
-from diffusyn.interface.worker import train_model_task, celery_app
+from diffusyn.interface.worker import train_model_task, generate_data_task, celery_app
 from diffusyn.core.pipeline import TabularDiffusion
+from diffusyn.interface.storage import LocalStorage
 
-app = FastAPI(title="Diffu-Syn API (Cloud Native)", version="0.2.0")
+app = FastAPI(title="Diffu-Syn API", version="0.4.0")
 
-# --- Config ---
-UPLOAD_DIR = "data/raw"
-MODEL_DIR = "data/models"
-OUTPUT_DIR = "data/outputs"
-
-for d in [UPLOAD_DIR, MODEL_DIR, OUTPUT_DIR]:
-    os.makedirs(d, exist_ok=True)
-
+upload_storage = LocalStorage(base_dir=settings.UPLOAD_DIR)
+output_storage = LocalStorage(base_dir=settings.OUTPUT_DIR)
 
 class GenerateRequest(BaseModel):
-    task_id: str
+    task_id: str  # The ID of the TRAINING task (to find the model)
     n_samples: int = 100
 
 
 @app.post("/train")
-async def train(file: UploadFile = File(...), epochs: int = settings.DEFAULT_EPOCHS):
-    """
-    Async Training Endpoint.
-    1. Saves file to disk (or S3 in future).
-    2. Pushes job to Redis.
-    3. Returns Task ID immediately.
-    """
-    # 1. Save File
+async def train(
+        file: UploadFile = File(...),
+        epochs: int = settings.DEFAULT_EPOCHS
+):
+    # 1. Generate ID
     file_id = str(uuid.uuid4())
-    file_path = os.path.join(UPLOAD_DIR, f"{file_id}.csv")
+    filename = f"{file_id}.csv"
 
-    async with aiofiles.open(file_path, 'wb') as out_file:
-        while content := await file.read(settings.CHUNK_SIZE_BYTES):
-            await out_file.write(content)
+    # 2. Save using Service
+    try:
+        saved_path = upload_storage.save_upload(file, filename)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
-    # 2. Define Output Path
-    model_path = os.path.join(MODEL_DIR, f"{file_id}.pth")
+    # 3. Define Model Path
+    model_filename = f"{file_id}.pth"
+    model_path = os.path.join(settings.MODEL_DIR, model_filename)
 
-    # 3. Offload to Worker (Non-blocking)
-    task = train_model_task.delay(file_path, model_path, epochs)
+    # 4. Offload to Worker
+    task = train_model_task.delay(filename, model_path, epochs)
 
     return {
         "message": "Training queued",
@@ -57,7 +50,7 @@ async def train(file: UploadFile = File(...), epochs: int = settings.DEFAULT_EPO
 
 @app.get("/status/{task_id}")
 def get_status(task_id: str):
-    """Check if the worker has finished."""
+    """Check if ANY worker task (Train or Generate) has finished."""
     result = celery_app.AsyncResult(task_id)
     return {
         "task_id": task_id,
@@ -67,29 +60,45 @@ def get_status(task_id: str):
 
 
 @app.post("/generate")
-def generate(request: GenerateRequest):
+async def trigger_generation(request: GenerateRequest):
     """
-    Inference Endpoint.
+    Async Inference Endpoint.
     """
-    # 1. Check if Training is Done
-    task_result = celery_app.AsyncResult(request.task_id)
-    if not task_result.successful():
-        raise HTTPException(status_code=400, detail=f"Training not complete. Status: {task_result.status}")
+    # 1. Lookup the Training Task to find the Model
+    training_result = celery_app.AsyncResult(request.task_id)
 
-    model_path = task_result.result.get("model_path")
-    if not model_path or not os.path.exists(model_path):
-        raise HTTPException(status_code=404, detail="Model file not found.")
+    if not training_result.successful():
+        raise HTTPException(status_code=400,
+                            detail=f"Training not complete or failed. Status: {training_result.status}")
 
-    # 2. Load Core Library
-    model = TabularDiffusion()
-    model.load(model_path)
+    full_model_path = training_result.result.get("model_path")
+    if not full_model_path:
+        raise HTTPException(status_code=404, detail="Model info not found in training result")
 
-    # 3. Generate
-    df = model.generate(n_samples=request.n_samples)
+    model_filename = os.path.basename(full_model_path)
 
-    # 4. Return CSV
-    output_filename = f"syn_{request.task_id}.csv"
-    output_path = os.path.join(OUTPUT_DIR, output_filename)
-    df.write_csv(output_path)
+    # 2. Prepare Output
+    job_id = str(uuid.uuid4())
+    output_filename = f"syn_{job_id}.csv"
 
-    return FileResponse(output_path, media_type="text/csv", filename=output_filename)
+    # 3. Offload to Worker
+    task = generate_data_task.delay(
+        model_filename=model_filename,
+        n_samples=request.n_samples,
+        output_filename=output_filename
+    )
+
+    return {
+        "message": "Generation queued",
+        "generation_task_id": task.id,
+        "download_url": f"/download/{output_filename}"
+    }
+
+
+@app.get("/download/{filename}")
+async def download_file(filename: str):
+    try:
+        file_path = output_storage.get_local_path(filename)
+        return FileResponse(file_path, media_type='text/csv', filename=filename)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="File not ready or not found.")
