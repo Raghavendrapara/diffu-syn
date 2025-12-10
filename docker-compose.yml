@@ -1,0 +1,46 @@
+services:
+  # --- 1. The Message Broker (Redis) ---
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # --- 2. The API Server (Producer) ---
+  api:
+    build: .
+    command: uvicorn diffusyn.interface.api:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    environment:
+      # Inject Config via Env Vars (12-Factor App)
+      - DIFFUSYN_REDIS_URL=redis://redis:6379/0
+      - DIFFUSYN_UPLOAD_DIR=/app/data/raw
+    volumes:
+      # Mount data so we can see uploads on host
+      - ./data:/app/data
+      # Hot-reload code during dev
+      - ./src:/app/src
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # --- 3. The Worker (Consumer) ---
+  # To scale: docker-compose up -d --scale worker=5
+  worker:
+    build: .
+    # Override default command to run Celery instead of Uvicorn
+    command: celery -A diffusyn.interface.worker.celery_app worker --loglevel=info
+    environment:
+      - DIFFUSYN_REDIS_URL=redis://redis:6379/0
+      - DIFFUSYN_UPLOAD_DIR=/app/data/raw
+    volumes:
+      - ./data:/app/data
+      - ./src:/app/src
+    depends_on:
+      redis:
+        condition: service_healthy
