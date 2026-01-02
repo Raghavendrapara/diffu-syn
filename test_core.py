@@ -9,18 +9,18 @@ df = pl.DataFrame({
     "score": np.random.rand(1000)
 })
 print(df.head(10))
-print("✅ Data Created")
+print("Data Created")
 
-# 2. Initialize Model (FIXED: No epochs here)
+# 2. Initialize Model
 model = TabularDiffusion()
 
-# 3. Train (FIXED: Epochs go here)
-print("🧠 Training...")
+# 3. Train
+print("Training...")
 model.fit(df, epochs=1)
 
 # 4. Generate
-print("⚡ Generating...")
+print("Generating...")
 synthetic = model.generate(n_samples=5)
 print(synthetic)
 
-print("🎉 Success! Core library is decoupled.")
+print("Success! Core library is decoupled.")

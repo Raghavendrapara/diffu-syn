@@ -35,19 +35,16 @@ class ResidualBlock(nn.Module):
         self.act = nn.ReLU()
         self.linear2 = nn.Linear(dim, dim)
         self.dropout = nn.Dropout(dropout)
-        self.norm = nn.LayerNorm(dim)  # Normalization helps training stability
+        self.norm = nn.LayerNorm(dim)
 
     def forward(self, x):
-        # Save the original input (The "Residual")
         residual = x
 
-        # Pass through the dense layers
         out = self.linear1(x)
         out = self.act(out)
         out = self.dropout(out)
         out = self.linear2(out)
 
-        # Add the residual back (The "Skip Connection")
         return self.norm(out + residual)
 
 
@@ -60,68 +57,51 @@ class TabularModel(nn.Module):
     def __init__(self, input_dim, hidden_dim=128, layers=3, dropout=0.1):
         super().__init__()
 
-        # 1. Time Embedding: Maps t -> vector of size 'hidden_dim'
         self.time_mlp = nn.Sequential(
             SinusoidalPositionEmbeddings(hidden_dim),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU()
         )
 
-        # 2. Input Projection: Maps Data -> vector of size 'hidden_dim'
         self.input_proj = nn.Linear(input_dim, hidden_dim)
 
-        # 3. The Deep Network (Stack of Residual Blocks)
         self.network = nn.ModuleList([
             ResidualBlock(hidden_dim, dropout) for _ in range(layers)
         ])
 
-        # 4. Output Projection: Maps hidden_dim -> Original Data Dimension
         self.output_proj = nn.Linear(hidden_dim, input_dim)
 
     def forward(self, x, t):
-        # x shape: [batch_size, input_dim]
-        # t shape: [batch_size]
 
-        # 1. Embed Time and Data
-        t_emb = self.time_mlp(t)  # [batch, hidden_dim]
-        x_emb = self.input_proj(x)  # [batch, hidden_dim]
+        t_emb = self.time_mlp(t)
+        x_emb = self.input_proj(x)
 
-        # 2. Combine them (Add time info to every data point)
         h = x_emb + t_emb
 
-        # 3. Pass through deep layers
         for layer in self.network:
             h = layer(h)
 
-        # 4. Project back to output size
         return self.output_proj(h)
 
 
-# ==========================================
-# SANITY CHECK
-# ==========================================
 if __name__ == "__main__":
     print("Initializing Tabular Model...")
 
     # Define dimensions
     batch_size = 32
-    input_features = 10  # e.g., Age, Salary, etc.
+    input_features = 10
 
-    # Create Model
     model = TabularModel(input_dim=input_features, hidden_dim=64, layers=2)
     print("Model Architecture Created.")
 
-    # Create Dummy Inputs
     x = torch.randn(batch_size, input_features)  # Noisy Data
     t = torch.randint(0, 1000, (batch_size,))  # Random Time Steps
 
-    # Forward Pass
     output = model(x, t)
 
     print(f"Input Shape: {x.shape}")
     print(f"Output Shape: {output.shape}")
 
-    # Verification
     if output.shape == x.shape:
         print("Test Complete. Brain is ready.")
     else:

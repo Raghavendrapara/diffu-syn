@@ -17,7 +17,7 @@ output_storage = LocalStorage(base_dir=settings.OUTPUT_DIR)
 @celery_app.task(bind=True)
 def train_model_task(self, filename: str, model_save_path: str, epochs: int = 5):
     try:
-        print(f"👷 Worker received job for file: {filename}")
+        print(f" Worker received job for file: {filename}")
 
         file_path = upload_storage.get_local_path(filename)
 
@@ -29,7 +29,7 @@ def train_model_task(self, filename: str, model_save_path: str, epochs: int = 5)
         return {"status": "success", "model_path": model_save_path}
 
     except Exception as e:
-        print(f"❌ Training failed: {e}")
+        print(f"Training failed: {e}")
         self.retry(exc=e, countdown=60, max_retries=3)
 
 
@@ -51,5 +51,5 @@ def generate_data_task(self, model_filename: str, n_samples: int, output_filenam
         return {"status": "success", "file_id": output_filename}
 
     except Exception as e:
-        print(f"❌ Generation failed: {e}")
+        print(f" Generation failed: {e}")
         self.retry(exc=e, countdown=60, max_retries=3)

@@ -35,7 +35,6 @@ class LocalStorage:
         file_path = os.path.join(self.base_dir, filename)
 
         # 2. Write in chunks (Non-blocking)
-        # We assume 'upload_file' behaves like a FastAPI UploadFile (has .read)
         async with aiofiles.open(file_path, 'wb') as out_file:
             while content := await upload_file.read(1024 * 1024):  # 1MB chunks
                 await out_file.write(content)

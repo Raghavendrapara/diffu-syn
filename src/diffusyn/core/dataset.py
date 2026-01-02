@@ -32,8 +32,6 @@ class DiffuSynDataset(IterableDataset):
 
     def _get_schema_info(self):
         """Helper to dynamically determine input dimensions."""
-        # Peek at the schema to get column count
-        # Note: In Polars Lazy, we might need to fetch schema from plan
         return self.lazy_df.collect_schema()
 
     def preprocess_batch(self, df: pl.DataFrame) -> torch.Tensor:

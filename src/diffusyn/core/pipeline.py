@@ -34,15 +34,13 @@ class TabularDiffusion:
         Trains the diffusion model on the provided data.
         data: Can be a file path (str) or a Polars DataFrame.
         """
-        # 1. Initialize Dataset
         dataset = DiffuSynDataset(data, batch_size=batch_size)
         dataloader = DataLoader(dataset, batch_size=None)
 
-        # 2. DYNAMICALLY Determine Dimensions
         if self.input_dim is None:
             schema = dataset._get_schema_info()
             self.input_dim = len(schema)
-            print(f"🧠 Auto-detected Input Dimension: {self.input_dim}")
+            print(f"Auto-detected Input Dimension: {self.input_dim}")
 
         # 3. Initialize Engine
         self.model = TabularModel(
@@ -56,7 +54,7 @@ class TabularDiffusion:
 
         # 4. Training Loop
         self.model.train()
-        print(f"🚀 Starting Training for {epochs} epochs...")
+        print(f"Starting Training for {epochs} epochs...")
 
         for epoch in range(epochs):
             pbar = tqdm(dataloader, desc=f"Epoch {epoch + 1}/{epochs}")
@@ -75,7 +73,7 @@ class TabularDiffusion:
         if not self.model:
             raise RuntimeError("Model is not trained! Call .fit() first.")
 
-        print(f"⚡ Generating {n_samples} samples...")
+        print(f"Generating {n_samples} samples...")
         synthetic_tensor = self.diffusion.sample(n_samples, self.input_dim)
 
         # Convert back to Polars

@@ -6,7 +6,6 @@ from pydantic import BaseModel
 
 from diffusyn.interface.config import settings
 from diffusyn.interface.worker import train_model_task, generate_data_task, celery_app
-from diffusyn.core.pipeline import TabularDiffusion
 from diffusyn.interface.storage import LocalStorage
 
 app = FastAPI(title="Diffu-Syn API", version="0.4.0")
@@ -15,7 +14,7 @@ upload_storage = LocalStorage(base_dir=settings.UPLOAD_DIR)
 output_storage = LocalStorage(base_dir=settings.OUTPUT_DIR)
 
 class GenerateRequest(BaseModel):
-    task_id: str  # The ID of the TRAINING task (to find the model)
+    task_id: str
     n_samples: int = 100
 
 
