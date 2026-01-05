@@ -11,6 +11,13 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+  flower:
+    image: mher/flower
+    command: celery --broker=redis://redis:6379/0 flower --port=5555
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
 
   # --- 2. API Server (The Producer) ---
   api:
@@ -34,7 +41,7 @@ services:
   worker:
     build: .
     # Override command to run Celery
-    command: celery -A diffusyn.interface.worker.celery_app worker --loglevel=info
+    command: celery -A diffusyn.interface.worker.celery_app worker --loglevel=info -E
     environment:
       - DIFFUSYN_REDIS_URL=redis://redis:6379/0
       - DIFFUSYN_UPLOAD_DIR=/app/data/raw
