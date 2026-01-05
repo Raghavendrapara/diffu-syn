@@ -58,7 +58,8 @@ def generate_data_task(self, model_filename: str, n_samples: int, output_filenam
 def evaluate_data_task(self, original_filename: str, synthetic_filename: str):
     try:
         import polars as pl
-        print(f"📊 Worker evaluating {synthetic_filename} against {original_filename}")
+        import pandas as pd
+        print(f"Worker evaluating {synthetic_filename} against {original_filename}")
 
         orig_path = upload_storage.get_local_path(original_filename, check_exists=True)
         syn_path = output_storage.get_local_path(synthetic_filename, check_exists=True)
@@ -68,6 +69,8 @@ def evaluate_data_task(self, original_filename: str, synthetic_filename: str):
 
         model = TabularDiffusion()
         report = model.evaluate(orig_df, syn_df)
+        if "details" in report:
+            report["details"] = report["details"].to_dict(orient="records")
 
         return {"status": "success", "report": report}
 

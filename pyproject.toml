@@ -9,17 +9,18 @@ authors = [
     {name = "Raghavendra"}
 ]
 
-# 1. CORE DEPENDENCIES (The "Plug" - Light & Portable)
+# 1. CORE DEPENDENCIES
 dependencies = [
-    "torch>=2.2.0",
+    "torch>=2.4.0",
     "polars>=0.20.0",
     "numpy>=1.26.0",
     "opacus>=1.4.0",
     "sdmetrics>=0.13.0",
-    "tqdm>=4.66.0"
+    "tqdm>=4.66.0",
+    "pyarrow>=14.0.0"
 ]
 
-# 2. SERVER DEPENDENCIES (The "Play" - Heavy Infrastructure)
+# 2. SERVER DEPENDENCIES
 [project.optional-dependencies]
 server = [
     "fastapi>=0.109.0",

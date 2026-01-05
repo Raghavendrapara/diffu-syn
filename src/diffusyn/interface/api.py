@@ -1,6 +1,6 @@
 import uuid
 import os
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -33,7 +33,7 @@ async def train(
 
     # 2. Save using Service
     try:
-        saved_path = upload_storage.save_upload(file, filename)
+        saved_path = await upload_storage.save_upload(file, filename)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
@@ -63,7 +63,9 @@ def get_status(task_id: str):
 
 
 @app.post("/generate")
-async def trigger_generation(request: GenerateRequest):
+async def trigger_generation(request: GenerateRequest,
+                             req: Request
+):
     """
     Async Inference Endpoint.
     """
@@ -91,10 +93,13 @@ async def trigger_generation(request: GenerateRequest):
         output_filename=output_filename
     )
 
+    full_download_url = str(req.url_for("download_file", filename=output_filename))
+
     return {
         "message": "Generation queued",
         "generation_task_id": task.id,
-        "download_url": f"/download/{output_filename}"
+        "filename": output_filename,
+        "download_url": full_download_url
     }
 
 

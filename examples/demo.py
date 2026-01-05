@@ -5,7 +5,7 @@ from diffusyn.core.pipeline import TabularDiffusion
 
 def main():
     print("="*60)
-    print("🚀 Diffu-Syn: End-to-End Demo Workflow")
+    print(" Diffu-Syn: End-to-End Demo Workflow")
     print("="*60)
 
     # ---------------------------------------------------------
@@ -44,9 +44,9 @@ def main():
 
     # Verify column mapping
     if df_syn.columns == df_real.columns:
-        print("    ✅ Column mapping preserved successfully.")
+        print("     Column mapping preserved successfully.")
     else:
-        print(f"    ❌ Column mapping failed! Got {df_syn.columns}")
+        print(f"    Column mapping failed! Got {df_syn.columns}")
 
     # ---------------------------------------------------------
     # 4. Evaluate Quality
@@ -58,7 +58,7 @@ def main():
         print("    - Column Shape Quality:")
         print(report['details'])
     except Exception as e:
-        print(f"    ⚠️ Evaluation skipped/failed: {e}")
+        print(f"     Evaluation skipped/failed: {e}")
 
     # ---------------------------------------------------------
     # 5. Model Persistence (Save/Load)
@@ -82,7 +82,7 @@ def main():
         print("    - Cleanup: Removed temporary model file.")
 
     print("\n" + "="*60)
-    print("🎉 Demo Complete! The system is fully operational.")
+    print("Demo Complete! The system is fully operational.")
     print("="*60)
 
 if __name__ == "__main__":

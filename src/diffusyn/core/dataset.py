@@ -63,6 +63,10 @@ class DiffuSynDataset(IterableDataset):
         return torch.tensor(df.to_numpy(), dtype=torch.float32)
 
     def __iter__(self):
-        stream = self.lazy_df.collect(engine="streaming").iter_slices(n_rows=self.batch_size)
-        for batch_df in stream:
-            yield self.preprocess_batch(batch_df)
+        if hasattr(self, 'path'):
+            reader = pl.read_csv_batched(self.path, batch_size=self.batch_size)
+            while True:
+                batches = reader.next_batches(1)
+                if not batches:
+                    break
+                yield self.preprocess_batch(batches[0])
