@@ -4,3 +4,4 @@
 *.pth
 *.csv
 .venv/*
+./redis-data
