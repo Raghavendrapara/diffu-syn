@@ -22,6 +22,7 @@ class DiffuSynDataset(IterableDataset):
 
         # 2. Handle In-Memory DataFrame (Library/Notebook Mode)
         elif isinstance(data, pl.DataFrame):
+            self.df_data = data
             self.lazy_df = data.lazy()
 
         elif isinstance(data, pl.LazyFrame):
@@ -70,3 +71,9 @@ class DiffuSynDataset(IterableDataset):
                 if not batches:
                     break
                 yield self.preprocess_batch(batches[0])
+
+        elif self.df_data is not None:
+            n_rows = len(self.df_data)
+            for i in range(0, n_rows, self.batch_size):
+                slice_df = self.df_data.slice(i, self.batch_size)
+                yield self.preprocess_batch(slice_df)
