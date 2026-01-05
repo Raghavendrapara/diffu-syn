@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from diffusyn.interface.config import settings
-from diffusyn.interface.worker import train_model_task, generate_data_task, celery_app
+from diffusyn.interface.worker import train_model_task, generate_data_task, evaluate_data_task, celery_app
 from diffusyn.interface.storage import LocalStorage
 
 app = FastAPI(title="Diffu-Syn API", version="0.4.0")
@@ -16,6 +16,10 @@ output_storage = LocalStorage(base_dir=settings.OUTPUT_DIR)
 class GenerateRequest(BaseModel):
     task_id: str
     n_samples: int = 100
+
+class EvaluateRequest(BaseModel):
+    file_id: str
+    synthetic_filename: str
 
 
 @app.post("/train")
@@ -91,6 +95,24 @@ async def trigger_generation(request: GenerateRequest):
         "message": "Generation queued",
         "generation_task_id": task.id,
         "download_url": f"/download/{output_filename}"
+    }
+
+
+@app.post("/evaluate")
+async def trigger_evaluation(request: EvaluateRequest):
+    """
+    Quality Evaluation Endpoint.
+    """
+    original_filename = f"{request.file_id}.csv"
+    
+    task = evaluate_data_task.delay(
+        original_filename=original_filename,
+        synthetic_filename=request.synthetic_filename
+    )
+
+    return {
+        "message": "Evaluation queued",
+        "evaluation_task_id": task.id
     }
 
 

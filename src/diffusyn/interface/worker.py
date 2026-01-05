@@ -39,7 +39,6 @@ def generate_data_task(self, model_filename: str, n_samples: int, output_filenam
         print(f"🔮 Worker generating {n_samples} samples...")
 
         model_path = model_storage.get_local_path(model_filename, check_exists=True)
-
         output_path = output_storage.get_local_path(output_filename, check_exists=False)
 
         # 3. Generate & Save
@@ -52,4 +51,26 @@ def generate_data_task(self, model_filename: str, n_samples: int, output_filenam
 
     except Exception as e:
         print(f" Generation failed: {e}")
+        self.retry(exc=e, countdown=60, max_retries=3)
+
+
+@celery_app.task(bind=True)
+def evaluate_data_task(self, original_filename: str, synthetic_filename: str):
+    try:
+        import polars as pl
+        print(f"📊 Worker evaluating {synthetic_filename} against {original_filename}")
+
+        orig_path = upload_storage.get_local_path(original_filename, check_exists=True)
+        syn_path = output_storage.get_local_path(synthetic_filename, check_exists=True)
+
+        orig_df = pl.read_csv(orig_path)
+        syn_df = pl.read_csv(syn_path)
+
+        model = TabularDiffusion()
+        report = model.evaluate(orig_df, syn_df)
+
+        return {"status": "success", "report": report}
+
+    except Exception as e:
+        print(f"Evaluation failed: {e}")
         self.retry(exc=e, countdown=60, max_retries=3)

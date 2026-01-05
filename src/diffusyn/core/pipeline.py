@@ -28,6 +28,7 @@ class TabularDiffusion:
         self.model = None
         self.diffusion = None
         self.input_dim = None
+        self.columns = None
 
     def fit(self, data, epochs=5, batch_size=1024):
         """
@@ -39,7 +40,8 @@ class TabularDiffusion:
 
         if self.input_dim is None:
             schema = dataset._get_schema_info()
-            self.input_dim = len(schema)
+            self.columns = schema.names()
+            self.input_dim = len(self.columns)
             print(f"Auto-detected Input Dimension: {self.input_dim}")
 
         # 3. Initialize Engine
@@ -78,21 +80,54 @@ class TabularDiffusion:
 
         # Convert back to Polars
         data = synthetic_tensor.cpu().numpy()
-        # TODO: Ideally we map these back to original column names
-        cols = [f"col_{i}" for i in range(self.input_dim)]
+        cols = self.columns if self.columns else [f"col_{i}" for i in range(self.input_dim)]
         return pl.DataFrame(data, schema=cols)
 
     def save(self, path):
         torch.save({
             "model_state": self.model.state_dict(),
-            "config": {"input_dim": self.input_dim}
+            "config": {
+                "input_dim": self.input_dim,
+                "columns": self.columns,
+                "hidden_dim": self.hidden_dim,
+                "layers": self.layers
+            }
         }, path)
 
     def load(self, path):
         checkpoint = torch.load(path, map_location=self.device)
         self.input_dim = checkpoint["config"]["input_dim"]
+        self.columns = checkpoint["config"].get("columns")
+        self.hidden_dim = checkpoint["config"].get("hidden_dim", self.hidden_dim)
+        self.layers = checkpoint["config"].get("layers", self.layers)
 
         # Re-init model
         self.model = TabularModel(self.input_dim, self.hidden_dim, self.layers).to(self.device)
         self.diffusion = DiffusionEngine(self.model, device=self.device)
         self.model.load_state_dict(checkpoint["model_state"])
+
+    def evaluate(self, original_data, synthetic_data):
+        """
+        Evaluates the quality of synthetic data using SDMetrics.
+        """
+        from sdmetrics.reports.single_table import QualityReport
+
+        # Convert to Pandas if necessary (SDMetrics prefers Pandas)
+        if isinstance(original_data, pl.DataFrame):
+            original_data = original_data.to_pandas()
+        if isinstance(synthetic_data, pl.DataFrame):
+            synthetic_data = synthetic_data.to_pandas()
+
+        # Basic metadata (infer from columns if not provided)
+        # For simplicity, we assume all columns are numerical for now
+        metadata = {
+            "columns": {col: {"sdtype": "numerical"} for col in original_data.columns}
+        }
+
+        report = QualityReport()
+        report.generate(original_data, synthetic_data, metadata)
+
+        return {
+            "score": report.get_score(),
+            "details": report.get_details("Column Shapes")
+        }
