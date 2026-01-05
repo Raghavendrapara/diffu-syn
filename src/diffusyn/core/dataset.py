@@ -30,9 +30,32 @@ class DiffuSynDataset(IterableDataset):
         else:
             raise ValueError("Data must be a file path (str) or Polars DataFrame")
 
+        # Validate Schema immediately
+        self.validate_schema()
+
     def _get_schema_info(self):
         """Helper to dynamically determine input dimensions."""
         return self.lazy_df.collect_schema()
+
+    def validate_schema(self):
+        """
+        Ensures all columns are numerical.
+        Raises ValueError if categorical/string columns are found.
+        """
+        schema = self._get_schema_info()
+        non_numeric = []
+        
+        for name, dtype in schema.items():
+            # Polars types: Float32, Float64, Int32, Int64, etc.
+            if not (dtype.is_numeric() or dtype.is_float() or dtype.is_integer()):
+                non_numeric.append(name)
+        
+        if non_numeric:
+            raise ValueError(
+                f"Non-numerical columns found: {non_numeric}. "
+                "Current version only supports numerical data. "
+                "Please preprocess (e.g., OneHotEncode) your data first."
+            )
 
     def preprocess_batch(self, df: pl.DataFrame) -> torch.Tensor:
         if self.numerical_cols:

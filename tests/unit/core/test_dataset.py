@@ -26,3 +26,18 @@ def test_dataset_file_loading(dummy_data, tmp_path):
     dataset = DiffuSynDataset(str(csv_path), batch_size=10)
     schema = dataset._get_schema_info()
     assert schema.names() == ["col_a", "col_b", "col_c"]
+
+def test_non_numerical_column_error():
+    # Create a DataFrame with a string column
+    bad_df = pl.DataFrame({
+        "num": [1.0, 2.0],
+        "cat": ["A", "B"]
+    })
+    
+    # It should raise a ValueError when we try to iterate/load it
+    dataset = DiffuSynDataset(bad_df)
+    
+    with pytest.raises(ValueError, match="Non-numerical columns found"):
+        # Trigger processing (since it's lazy, we might need to iterate or check in init)
+        # We will implement the check in __init__ or _get_schema_info
+        dataset.validate_schema()

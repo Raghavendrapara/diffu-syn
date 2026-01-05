@@ -1,0 +1,56 @@
+# ==========================================
+# STAGE 1: Builder (Heavy Lifting)
+# ==========================================
+FROM python:3.10-slim as builder
+
+WORKDIR /app
+
+# Install system build dependencies (GCC, etc.)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a virtual environment
+RUN python -m venv /opt/venv
+# Enable venv for the upcoming commands
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy dependency definition
+COPY pyproject.toml README.md ./
+
+# Install dependencies into the virtual environment
+# Note: In a real prod setup, we would copy 'requirements.lock' here instead
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir ".[server]"
+
+# ==========================================
+# STAGE 2: Runner (Lean & Secure)
+# ==========================================
+FROM python:3.10-slim as runner
+
+WORKDIR /app
+
+# Create a non-root user for security
+RUN groupadd -r diffuuser && useradd -r -g diffuuser diffuuser
+
+# Copy only the compiled virtual environment from the builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Set environment variables
+ENV PATH="/opt/venv/bin:$PATH"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Copy the application code
+COPY src ./src
+COPY pyproject.toml README.md ./
+
+# Install the application logic (without re-installing dependencies)
+# This ensures 'import diffusyn' works everywhere
+RUN pip install --no-deps .
+
+# Switch to non-root user
+USER diffuuser
+
+# Command to run the application
+CMD ["uvicorn", "diffusyn.interface.api:app", "--host", "0.0.0.0", "--port", "8000"]

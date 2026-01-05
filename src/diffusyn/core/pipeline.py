@@ -68,20 +68,37 @@ class TabularDiffusion:
                 optimizer.step()
                 pbar.set_postfix({"Loss": f"{loss.item():.4f}"})
 
-    def generate(self, n_samples: int) -> pl.DataFrame:
+    def generate(self, n_samples: int, batch_size: int = 10000) -> pl.DataFrame:
         """
-        Generates synthetic data.
+        Generates synthetic data in batches to avoid OOM errors.
         """
         if not self.model:
             raise RuntimeError("Model is not trained! Call .fit() first.")
 
-        print(f"Generating {n_samples} samples...")
-        synthetic_tensor = self.diffusion.sample(n_samples, self.input_dim)
-
-        # Convert back to Polars
-        data = synthetic_tensor.cpu().numpy()
+        print(f"Generating {n_samples} samples in batches of {batch_size}...")
+        
+        generated_batches = []
+        remaining = n_samples
+        
+        # Calculate column names once
         cols = self.columns if self.columns else [f"col_{i}" for i in range(self.input_dim)]
-        return pl.DataFrame(data, schema=cols)
+
+        while remaining > 0:
+            current_batch_size = min(remaining, batch_size)
+            
+            # Generate batch on device
+            batch_tensor = self.diffusion.sample(current_batch_size, self.input_dim)
+            
+            # Move to CPU and numpy immediately to free VRAM
+            batch_data = batch_tensor.cpu().numpy()
+            
+            # Wrap in Polars DataFrame
+            generated_batches.append(pl.DataFrame(batch_data, schema=cols))
+            
+            remaining -= current_batch_size
+
+        # Combine all batches
+        return pl.concat(generated_batches)
 
     def save(self, path):
         torch.save({
@@ -106,26 +123,34 @@ class TabularDiffusion:
         self.diffusion = DiffusionEngine(self.model, device=self.device)
         self.model.load_state_dict(checkpoint["model_state"])
 
-    def evaluate(self, original_data, synthetic_data):
+    def evaluate(self, original_data, synthetic_data, sample_size: int = 50000):
         """
         Evaluates the quality of synthetic data using SDMetrics.
+        Auto-samples data to avoid MemoryErrors with large datasets.
         """
         from sdmetrics.reports.single_table import QualityReport
 
-        # Convert to Pandas if necessary (SDMetrics prefers Pandas)
-        if isinstance(original_data, pl.DataFrame):
-            original_data = original_data.to_pandas()
-        if isinstance(synthetic_data, pl.DataFrame):
-            synthetic_data = synthetic_data.to_pandas()
+        # Helper to sample and convert
+        def prepare_df(df, limit):
+            if isinstance(df, pl.DataFrame):
+                if len(df) > limit:
+                    df = df.sample(n=limit, with_replacement=False)
+                return df.to_pandas()
+            # If already pandas or other, assume it fits or user handled it
+            return df
+
+        print(f"Sampling data (limit={sample_size}) for evaluation...")
+        original_pandas = prepare_df(original_data, sample_size)
+        synthetic_pandas = prepare_df(synthetic_data, sample_size)
 
         # Basic metadata (infer from columns if not provided)
         # For simplicity, we assume all columns are numerical for now
         metadata = {
-            "columns": {col: {"sdtype": "numerical"} for col in original_data.columns}
+            "columns": {col: {"sdtype": "numerical"} for col in original_pandas.columns}
         }
 
         report = QualityReport()
-        report.generate(original_data, synthetic_data, metadata)
+        report.generate(original_pandas, synthetic_pandas, metadata)
 
         return {
             "score": report.get_score(),

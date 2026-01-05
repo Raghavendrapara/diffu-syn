@@ -1,0 +1,31 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: always
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: diffusyn:prod
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DIFFUSYN_REDIS_URL=redis://redis:6379/0
+      - DIFFUSYN_UPLOAD_DIR=/app/data/raw
+    depends_on:
+      - redis
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: diffusyn:prod
+    restart: always
+    command: celery -A diffusyn.interface.worker.celery_app worker --loglevel=info
+    environment:
+      - DIFFUSYN_REDIS_URL=redis://redis:6379/0
+      - DIFFUSYN_UPLOAD_DIR=/app/data/raw
+    depends_on:
+      - redis
